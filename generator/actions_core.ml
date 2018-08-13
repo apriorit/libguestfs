@@ -435,7 +435,7 @@ not all belong to a single logical operating system
 
   { defaults with
     name = "add_drive"; added = (0, 0, 3);
-    style = RErr, [String "filename"], [OBool "readonly"; OString "format"; OString "iface"; OString "name"; OString "label"; OString "protocol"; OStringList "server"; OString "username"; OString "secret"; OString "cachemode"; OString "discard"; OBool "copyonread"];
+    style = RErr, [String "filename"], [OBool "readonly"; OString "format"; OString "iface"; OString "name"; OString "label"; OString "protocol"; OStringList "server"; OString "username"; OString "secret"; OString "cachemode"; OString "discard"; OBool "copyonread"; OString "device"];
     once_had_no_optargs = true;
     blocking = false;
     fish_alias = ["add"];

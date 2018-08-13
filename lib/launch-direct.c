@@ -575,7 +575,12 @@ launch_direct (guestfs_h *g, void *datav, const char *arg)
       ADD_CMDLINE ("-drive");
       ADD_CMDLINE_PRINTF ("%s,if=none" /* sic */, param);
       ADD_CMDLINE ("-device");
-      ADD_CMDLINE_PRINTF ("scsi-hd,drive=hd%zu", i);
+      if (drv->device == device_cdrom) {
+        ADD_CMDLINE_PRINTF ("scsi-cd,drive=hd%zu", i);
+      }
+      else {
+        ADD_CMDLINE_PRINTF ("scsi-hd,drive=hd%zu", i);
+      }
     }
     else {
     virtio_blk:
@@ -927,13 +932,15 @@ make_appliance_dev (guestfs_h *g, int virtio_scsi)
 
   /* Calculate the index of the drive. */
   ITER_DRIVES (g, i, drv) {
-    if (virtio_scsi) {
-      if (drv->iface == NULL || STREQ (drv->iface, "ide"))
-        index++;
-    }
-    else /* virtio-blk */ {
-      if (drv->iface == NULL || STRNEQ (drv->iface, "virtio"))
-        index++;
+    if (drv->device == device_disk) {
+      if (virtio_scsi) {
+        if (drv->iface == NULL || STREQ (drv->iface, "ide"))
+          index++;
+      }
+      else /* virtio-blk */ {
+        if (drv->iface == NULL || STRNEQ (drv->iface, "virtio"))
+          index++;
+      }
     }
   }
 

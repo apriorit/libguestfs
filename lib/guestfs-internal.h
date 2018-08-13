@@ -257,6 +257,11 @@ enum discard {
   discard_besteffort,
 };
 
+enum device {
+  device_disk = 0,
+  device_cdrom,
+};
+
 /**
  * There is one C<struct drive> per drive, including hot-plugged drives.
  */
@@ -282,6 +287,7 @@ struct drive {
   char *cachemode;
   enum discard discard;
   bool copyonread;
+  enum device device;
 };
 
 /* Extra hv parameters (from guestfs_config). */
