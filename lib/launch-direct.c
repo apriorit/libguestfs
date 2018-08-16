@@ -578,7 +578,7 @@ launch_direct (guestfs_h *g, void *datav, const char *arg)
       if (drv->device == device_cdrom) {
         ADD_CMDLINE_PRINTF ("scsi-cd,drive=hd%zu", i);
       }
-      else {
+      else if (drv->device == device_disk) {
         ADD_CMDLINE_PRINTF ("scsi-hd,drive=hd%zu", i);
       }
     }
@@ -934,12 +934,14 @@ make_appliance_dev (guestfs_h *g, int virtio_scsi)
   ITER_DRIVES (g, i, drv) {
     if (drv->device == device_disk) {
       if (virtio_scsi) {
-        if (drv->iface == NULL || STREQ (drv->iface, "ide"))
+        if (drv->iface == NULL || STREQ (drv->iface, "ide")) {
           index++;
+        }
       }
       else /* virtio-blk */ {
-        if (drv->iface == NULL || STRNEQ (drv->iface, "virtio"))
+        if (drv->iface == NULL || STRNEQ (drv->iface, "virtio")) {
           index++;
+        }
       }
     }
   }

@@ -257,7 +257,7 @@ enum discard {
   discard_besteffort,
 };
 
-enum device {
+enum device_type {
   device_disk = 0,
   device_cdrom,
 };
@@ -287,7 +287,7 @@ struct drive {
   char *cachemode;
   enum discard discard;
   bool copyonread;
-  enum device device;
+  enum device_type device;
 };
 
 /* Extra hv parameters (from guestfs_config). */
