@@ -663,9 +663,9 @@ compare_device_names (const char *a, const char *b)
   if (STRPREFIX (b, "/dev/"))
     b += 5;
 
-  /* Skip sd/hd/ubd/vd. */
-  alen = strcspn (a, "d");
-  blen = strcspn (b, "d");
+  /* Skip sd/hd/ubd/vd/sr. */
+  alen = strcspn (a, "dr");
+  blen = strcspn (b, "dr");
   assert (alen > 0 && alen <= 2);
   assert (blen > 0 && blen <= 2);
   a += alen + 1;

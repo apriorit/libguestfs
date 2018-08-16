@@ -58,6 +58,7 @@ struct drive_create_data {
   const char *cachemode;
   enum discard discard;
   bool copyonread;
+  enum device_type device;
 };
 
 COMPILE_REGEXP (re_hostname_port, "(.*):(\\d+)$", 0)
@@ -114,6 +115,7 @@ create_drive_file (guestfs_h *g,
   drv->cachemode = data->cachemode ? safe_strdup (g, data->cachemode) : NULL;
   drv->discard = data->discard;
   drv->copyonread = data->copyonread;
+  drv->device = data->device;
 
   if (data->readonly) {
     if (create_overlay (g, drv) == -1) {
@@ -436,6 +438,7 @@ create_drive_dev_null (guestfs_h *g,
   data->exportname = tmpfile;
   data->discard = discard_disable;
   data->copyonread = false;
+  data->device = device_disk;
 
   return create_drive_file (g, data);
 }
@@ -762,6 +765,23 @@ guestfs_impl_add_drive_opts (guestfs_h *g, const char *filename,
   }
   else
     data.discard = discard_disable;
+
+  if (optargs->bitmask & GUESTFS_ADD_DRIVE_OPTS_DEVICE_BITMASK) {
+    if (STREQ (optargs->device, "disk")) {
+        data.device = device_disk;
+    }
+    else if (STREQ (optargs->device, "cdrom")) {
+        data.device = device_cdrom;
+    }
+    else {
+        error (g, _("device parameter must be 'disk' or 'cdrom'"));
+        free_drive_servers (data.servers, data.nr_servers);
+        return -1;
+    }
+  }
+  else {
+      data.device = device_disk;
+  }
 
   data.copyonread =
     optargs->bitmask & GUESTFS_ADD_DRIVE_OPTS_COPYONREAD_BITMASK
