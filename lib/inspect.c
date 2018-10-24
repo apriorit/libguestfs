@@ -74,9 +74,11 @@ guestfs_impl_inspect_os (guestfs_h *g)
   if (fses == NULL) return NULL;
 
   for (fs = fses; *fs; fs += 2) {
-    if (guestfs_int_check_for_filesystem_on (g, *fs)) {
-      guestfs_int_free_inspect_info (g);
-      return NULL;
+    if (guestfs_int_check_for_filesystem_on (g, *fs)) 
+    {
+      //do not break handling, it is can be additional broke disk and root volume is ok.
+      //guestfs_int_free_inspect_info (g);
+      //return NULL;
     }
   }
 
