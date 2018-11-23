@@ -13,15 +13,28 @@ const char g_tbUsb[] = "usb";
 const char g_tbSata[] = "sata";
 const char g_tbSd[] = "sd"; //since 1.1.2.
 
-static const char * remove0xPrefix(const char *str)
+static const char *remove0xPrefix(const char *str)
 {
     return str + 2;
 }
 
-static char * getVirtioPath(guestfs_h *g, struct device_metadata* metadata, const char* part)
+static bool endsWith(const char *str, const char *end)
 {
-  struct device_metadata_address* address = &metadata->address;
-  struct device_metadata_target* target = &metadata->target;
+  size_t strLen = strlen(str);
+  size_t endLen = strlen(end);
+
+  if (endLen > strLen)
+  {
+      return false;
+  }
+
+  return (strcmp(end, str + (strLen - endLen)) == 0);
+}
+
+static char * getVirtioPath(guestfs_h *g, struct device_metadata *metadata, const char *part)
+{
+  struct device_metadata_address *address = &metadata->address;
+  struct device_metadata_target *target = &metadata->target;
 
   debug(g, "getVirtioPath metadata::address: type=%s, domain=%s, bus=%s, slot=%s, function=%s \n", 
             address->type, address->domain, address->bus, address->slot, address->function);
@@ -44,12 +57,10 @@ static char * getVirtioPath(guestfs_h *g, struct device_metadata* metadata, cons
                         (part == NULL ? "" : part));
 }
 
-bool isDiskByPath(guestfs_h *g, struct device_metadata* metadata, const char* part, const char* spec)
+bool isDiskByPath(guestfs_h *g, struct device_metadata *metadata, const char *part, const char *spec)
 {
   const char *targetBus = metadata->target.bus;
   char *path = NULL;
-  size_t pathLen = 0;
-  size_t specLen = 0;
   bool res = false;
 
   debug(g, "isDiskByPath spec=%s, part=%s", spec, part);
@@ -75,14 +86,7 @@ bool isDiskByPath(guestfs_h *g, struct device_metadata* metadata, const char* pa
   debug(g, "isDiskByPath path=%s", path);
 
   //compare only tail
-  pathLen = strlen(path);
-  specLen = strlen(spec);
-  if (pathLen > specLen)
-  {
-      return false;
-  }
-
-  res = (strcmp(path, spec + (specLen - pathLen)) == 0);
+  res = endsWith(spec, path);
   free(path);
 
   return res;

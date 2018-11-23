@@ -63,7 +63,8 @@ COMPILE_REGEXP (re_freebsd_mbr,
                 "^/dev/(ada{0,1}|vtbd)(\\d+)s(\\d+)([a-z])$", 0)
 COMPILE_REGEXP (re_freebsd_gpt, "^/dev/(ada{0,1}|vtbd)(\\d+)p(\\d+)$", 0)
 COMPILE_REGEXP (re_diskbyid, "^/dev/disk/by-id/.*-part(\\d+)$", 0)
-COMPILE_REGEXP (re_diskbypath, "^/dev/disk/by-path/.*-part(\\d+)$", 0)
+COMPILE_REGEXP (re_diskbypathpart, "^/dev/disk/by-path/.*-part(\\d+)$", 0)
+COMPILE_REGEXP (re_diskbypath, "^/dev/disk/by-path/.*", 0)
 COMPILE_REGEXP (re_netbsd, "^NetBSD (\\d+)\\.(\\d+)", 0)
 COMPILE_REGEXP (re_opensuse, "^(openSUSE|SuSE Linux|SUSE LINUX) ", 0)
 COMPILE_REGEXP (re_sles, "^SUSE (Linux|LINUX) Enterprise ", 0)
@@ -1848,7 +1849,7 @@ resolve_fstab_device_diskbypath (guestfs_h *g, const char *spec, const char *par
   struct device_metadata* metadata = NULL;
   char *device = NULL;
 
-  debug(g, "resolve_fstab_device_diskbypath part=%s", part);
+  debug(g, "resolve_fstab_device_diskbypath spec=%s, part=%s", spec, part);
 
   for (i = 0; i < g->nr_drives; ++i)
   {
@@ -1858,7 +1859,7 @@ resolve_fstab_device_diskbypath (guestfs_h *g, const char *spec, const char *par
 
     if (isDiskByPath(g, metadata, part, spec)) 
     {
-        device = safe_asprintf (g, "/dev/sd%c%s", (char)('a' + i), part);
+        device = safe_asprintf (g, "/dev/sd%c%s", (char)('a' + i), (part == NULL ? "" : part));
         debug(g, "diskbypath device=%s", device);
         break;
     }
@@ -1869,7 +1870,7 @@ resolve_fstab_device_diskbypath (guestfs_h *g, const char *spec, const char *par
       return 0;
   }
 
-  if (!guestfs_int_is_partition (g, device)) 
+  if (part != NULL && !guestfs_int_is_partition (g, device)) 
   {
     free (device);
     return 0;
@@ -2019,7 +2020,8 @@ resolve_fstab_device (guestfs_h *g, const char *spec, Hash_table *md_map,
     if (r == -1)
       return NULL;
   }
-  else if ((part = match1 (g, spec, re_diskbypath)) != NULL) {
+  else if ((part = match1 (g, spec, re_diskbypathpart)) != NULL || 
+           (match(g, spec, re_diskbypath))) {
     r = resolve_fstab_device_diskbypath (g, spec, part, &device);
     free (part);
     if (r == -1)
