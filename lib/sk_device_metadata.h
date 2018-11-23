@@ -1,6 +1,14 @@
 #ifndef SK_DEVICE_METADATA_H_
 #define SK_DEVICE_METADATA_H_
 
+#define DISK_BUS_IDE "ide"
+#define DISK_BUS_SCSI "scsi"
+#define DISK_BUS_VIRTIO "virtio"
+#define DISK_BUS_XEN "xen"
+#define DISK_BUS_USB "usb"
+#define DISK_BUS_SATA "sata"
+#define DISK_BUS_SD "sd" //since 1.1.2.
+
 struct device_metadata_address
 {
     const char *type; //'pci' 

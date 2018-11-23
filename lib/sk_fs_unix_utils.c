@@ -5,14 +5,6 @@
 
 #include "sk_fs_unix_utils.h"
 
-const char g_tbIde[] = "ide";
-const char g_tbScsi[] = "scsi";
-const char g_tbVirtio[] = "virtio";
-const char g_tbXen[] = "xen";
-const char g_tbUsb[] = "usb";
-const char g_tbSata[] = "sata";
-const char g_tbSd[] = "sd"; //since 1.1.2.
-
 static const char *remove0xPrefix(const char *str)
 {
     return str + 2;
@@ -34,20 +26,18 @@ static bool endsWith(const char *str, const char *end)
 static char * getVirtioPath(guestfs_h *g, struct device_metadata *metadata, const char *part)
 {
   struct device_metadata_address *address = &metadata->address;
-  struct device_metadata_target *target = &metadata->target;
 
   debug(g, "getVirtioPath metadata::address: type=%s, domain=%s, bus=%s, slot=%s, function=%s \n", 
             address->type, address->domain, address->bus, address->slot, address->function);
 
 
-  if (!target->bus || !address->type || !address->domain || 
+  if (!address->type || !address->domain || 
       !address->bus || !address->slot || !address->function)
   {
     return NULL;
   }
 
-  return safe_asprintf (g, "%s-%s-%s:%s:%s.%s%s%s", 
-                        target->bus,
+  return safe_asprintf (g, "%s-%s:%s:%s.%s%s%s", 
                         address->type,
                         remove0xPrefix(address->domain),
                         remove0xPrefix(address->bus),
@@ -55,6 +45,17 @@ static char * getVirtioPath(guestfs_h *g, struct device_metadata *metadata, cons
                         remove0xPrefix(address->function),
                         (part == NULL ? "" : "-part"),
                         (part == NULL ? "" : part));
+}
+
+static char * getIdePath(guestfs_h *g, struct device_metadata *metadata, const char *part)
+{
+  struct device_metadata_address *address = &metadata->address;
+
+  debug(g, "getIdePath metadata::address: type=%s, domain=%s, bus=%s, slot=%s, function=%s \n", 
+            address->type, address->domain, address->bus, address->slot, address->function);
+  //todo implement
+  return NULL;
+
 }
 
 bool isDiskByPath(guestfs_h *g, struct device_metadata *metadata, const char *part, const char *spec)
@@ -72,11 +73,16 @@ bool isDiskByPath(guestfs_h *g, struct device_metadata *metadata, const char *pa
     return false;
   }
 
-  if (strcmp(targetBus, g_tbVirtio) == 0)
+  if (STREQ(targetBus, DISK_BUS_VIRTIO))
   {
     path = getVirtioPath(g, metadata, part);
   }
-  //else if (strcmp(targetBus, g_tbIde))
+  else if (STREQ (targetBus, DISK_BUS_IDE) ||
+           STREQ (targetBus, DISK_BUS_SCSI) || 
+           STREQ (targetBus, DISK_BUS_SATA ))
+  {
+    path = getIdePath(g, metadata, part);
+  }
   
   if (!path)
   {

@@ -822,10 +822,10 @@ for_each_disk (guestfs_h *g,
 
       //Metadata +
 
-      xpathCtx->node = nodes->nodeTab[i];
-      xptargetDev = xmlXPathEvalExpression (BAD_CAST "./target/@dev", xpathCtx);
-      if (!xpath_object_is_empty (xptargetDev))
-        metadata->target.dev = xpath_object_get_string (doc, xptargetDev);
+    //   xpathCtx->node = nodes->nodeTab[i];
+    //   xptargetDev = xmlXPathEvalExpression (BAD_CAST "./target/@dev", xpathCtx);
+    //   if (!xpath_object_is_empty (xptargetDev))
+    //     metadata->target.dev = xpath_object_get_string (doc, xptargetDev);
 
       xpathCtx->node = nodes->nodeTab[i];
       xptargetBus = xmlXPathEvalExpression (BAD_CAST "./target/@bus", xpathCtx);
@@ -838,24 +838,33 @@ for_each_disk (guestfs_h *g,
         metadata->address.type = xpath_object_get_string (doc, xpaddressType);
 
       xpathCtx->node = nodes->nodeTab[i];
-      xpaddressDomain = xmlXPathEvalExpression (BAD_CAST "./address/@domain", xpathCtx);
-      if (!xpath_object_is_empty (xpaddressDomain))
-         metadata->address.domain = xpath_object_get_string (doc, xpaddressDomain);
-
-      xpathCtx->node = nodes->nodeTab[i];
       xpaddressBus = xmlXPathEvalExpression (BAD_CAST "./address/@bus", xpathCtx);
       if (!xpath_object_is_empty (xpaddressBus))
         metadata->address.bus = xpath_object_get_string (doc, xpaddressBus);
 
-      xpathCtx->node = nodes->nodeTab[i];
-      xpaddressSlot = xmlXPathEvalExpression (BAD_CAST "./address/@slot", xpathCtx);
-      if (!xpath_object_is_empty (xpaddressSlot))
-         metadata->address.slot = xpath_object_get_string (doc, xpaddressSlot);
+      if (STREQ (metadata->target.bus, DISK_BUS_VIRTIO))
+      {
+        xpathCtx->node = nodes->nodeTab[i];
+        xpaddressDomain = xmlXPathEvalExpression (BAD_CAST "./address/@domain", xpathCtx);
+        if (!xpath_object_is_empty (xpaddressDomain))
+          metadata->address.domain = xpath_object_get_string (doc, xpaddressDomain);
 
-      xpathCtx->node = nodes->nodeTab[i];
-      xpaddressFunction = xmlXPathEvalExpression (BAD_CAST "./address/@function", xpathCtx);
-      if (!xpath_object_is_empty (xpaddressFunction))
-        metadata->address.function = xpath_object_get_string (doc, xpaddressFunction);
+        xpathCtx->node = nodes->nodeTab[i];
+        xpaddressSlot = xmlXPathEvalExpression (BAD_CAST "./address/@slot", xpathCtx);
+        if (!xpath_object_is_empty (xpaddressSlot))
+          metadata->address.slot = xpath_object_get_string (doc, xpaddressSlot);
+
+        xpathCtx->node = nodes->nodeTab[i];
+        xpaddressFunction = xmlXPathEvalExpression (BAD_CAST "./address/@function", xpathCtx);
+        if (!xpath_object_is_empty (xpaddressFunction))
+          metadata->address.function = xpath_object_get_string (doc, xpaddressFunction);
+      }
+      else if (STREQ (metadata->target.bus, DISK_BUS_IDE) ||
+               STREQ (metadata->target.bus, DISK_BUS_SCSI) || 
+               STREQ (metadata->target.bus, DISK_BUS_SATA))
+      {
+        //todo add metadata 
+      }
 
       //Metadata -
 
