@@ -20,7 +20,6 @@ struct device_metadata
 {
     struct device_metadata_address address;
     struct device_metadata_target target; 
-    char check[10 + 1];
 };
 
 #endif /* SK_DEVICE_METADATA_H_ */

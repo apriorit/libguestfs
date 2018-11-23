@@ -36,6 +36,7 @@
 
 #include "guestfs.h"
 #include "guestfs-internal.h"
+#include "sk_fs_unix_utils.h"
 
 COMPILE_REGEXP (re_fedora, "Fedora release (\\d+)", 0)
 COMPILE_REGEXP (re_rhel_old, "Red Hat.*release (\\d+).*Update (\\d+)", 0)
@@ -1843,8 +1844,8 @@ static int
 resolve_fstab_device_diskbypath (guestfs_h *g, const char *spec, const char *part,
                                char **device_ret)
 {
-  size_t i;
-  struct device_metadata* metadata;
+  size_t i = 0;
+  struct device_metadata* metadata = NULL;
   char *device = NULL;
 
   debug(g, "resolve_fstab_device_diskbypath part=%s", part);
@@ -1854,13 +1855,8 @@ resolve_fstab_device_diskbypath (guestfs_h *g, const char *spec, const char *par
     debug(g, "diskbypath overlay=%s", g->drives[i]->overlay);
 
     metadata = &g->drives[i]->metadata;
-    debug(g, "diskbypath metadata::target: dev=%s, bus=%s \n", 
-                         metadata->target.dev, metadata->target.bus);
-    debug(g, "diskbypath metadata::address: type=%s, domain=%s, bus=%s, slot=%s, function=%s \n", 
-                         metadata->address.type, metadata->address.domain, metadata->address.bus, metadata->address.slot, metadata->address.function);
-    debug(g, "diskbypath metadata::check=%s", metadata->check);
- 
-    if (isDiskByPath(metadata, part, spec)) 
+
+    if (isDiskByPath(g, metadata, part, spec)) 
     {
         device = safe_asprintf (g, "/dev/sd%c%s", (char)('a' + i), part);
         debug(g, "diskbypath device=%s", device);

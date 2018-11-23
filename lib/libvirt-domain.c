@@ -556,6 +556,10 @@ for_each_disk (guestfs_h *g,
       CLEANUP_XMLXPATHFREEOBJECT xmlXPathObjectPtr xptargetBus = NULL;
       CLEANUP_XMLXPATHFREEOBJECT xmlXPathObjectPtr xpaddressType = NULL;
       CLEANUP_XMLXPATHFREEOBJECT xmlXPathObjectPtr xpaddressDomain = NULL;
+      CLEANUP_XMLXPATHFREEOBJECT xmlXPathObjectPtr xpaddressBus = NULL;
+      CLEANUP_XMLXPATHFREEOBJECT xmlXPathObjectPtr xpaddressSlot = NULL;
+      CLEANUP_XMLXPATHFREEOBJECT xmlXPathObjectPtr xpaddressFunction = NULL;
+
       memset(metadata, 0, sizeof(struct device_metadata));
       int readonly;
       int t;
@@ -816,6 +820,8 @@ for_each_disk (guestfs_h *g,
       if (!xpath_object_is_empty (xpreadonly))
         readonly = 1;
 
+      //Metadata +
+
       xpathCtx->node = nodes->nodeTab[i];
       xptargetDev = xmlXPathEvalExpression (BAD_CAST "./target/@dev", xpathCtx);
       if (!xpath_object_is_empty (xptargetDev))
@@ -836,7 +842,22 @@ for_each_disk (guestfs_h *g,
       if (!xpath_object_is_empty (xpaddressDomain))
          metadata->address.domain = xpath_object_get_string (doc, xpaddressDomain);
 
-      strcpy(metadata->check, "serge");
+      xpathCtx->node = nodes->nodeTab[i];
+      xpaddressBus = xmlXPathEvalExpression (BAD_CAST "./address/@bus", xpathCtx);
+      if (!xpath_object_is_empty (xpaddressBus))
+        metadata->address.bus = xpath_object_get_string (doc, xpaddressBus);
+
+      xpathCtx->node = nodes->nodeTab[i];
+      xpaddressSlot = xmlXPathEvalExpression (BAD_CAST "./address/@slot", xpathCtx);
+      if (!xpath_object_is_empty (xpaddressSlot))
+         metadata->address.slot = xpath_object_get_string (doc, xpaddressSlot);
+
+      xpathCtx->node = nodes->nodeTab[i];
+      xpaddressFunction = xmlXPathEvalExpression (BAD_CAST "./address/@function", xpathCtx);
+      if (!xpath_object_is_empty (xpaddressFunction))
+        metadata->address.function = xpath_object_get_string (doc, xpaddressFunction);
+
+      //Metadata -
 
       if (f)
         t = f (g, filename, format, readonly, protocol, server, username, secret, device, data);
