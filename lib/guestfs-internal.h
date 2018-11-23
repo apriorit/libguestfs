@@ -56,6 +56,7 @@
 #include "hash.h"
 
 #include "guestfs-internal-frontend.h"
+#include "sk_device_metadata.h"
 
 #if ENABLE_PROBES
 #include <sys/sdt.h>
@@ -288,6 +289,8 @@ struct drive {
   enum discard discard;
   bool copyonread;
   enum device_type device;
+
+  struct device_metadata metadata;
 };
 
 /* Extra hv parameters (from guestfs_config). */

@@ -62,6 +62,7 @@ COMPILE_REGEXP (re_freebsd_mbr,
                 "^/dev/(ada{0,1}|vtbd)(\\d+)s(\\d+)([a-z])$", 0)
 COMPILE_REGEXP (re_freebsd_gpt, "^/dev/(ada{0,1}|vtbd)(\\d+)p(\\d+)$", 0)
 COMPILE_REGEXP (re_diskbyid, "^/dev/disk/by-id/.*-part(\\d+)$", 0)
+COMPILE_REGEXP (re_diskbypath, "^/dev/disk/by-path/.*-part(\\d+)$", 0)
 COMPILE_REGEXP (re_netbsd, "^NetBSD (\\d+)\\.(\\d+)", 0)
 COMPILE_REGEXP (re_opensuse, "^(openSUSE|SuSE Linux|SUSE LINUX) ", 0)
 COMPILE_REGEXP (re_sles, "^SUSE (Linux|LINUX) Enterprise ", 0)
@@ -1838,6 +1839,50 @@ resolve_fstab_device_diskbyid (guestfs_h *g, const char *part,
   return 0;
 }
 
+static int
+resolve_fstab_device_diskbypath (guestfs_h *g, const char *spec, const char *part,
+                               char **device_ret)
+{
+  size_t i;
+  struct device_metadata* metadata;
+  char *device = NULL;
+
+  debug(g, "resolve_fstab_device_diskbypath part=%s", part);
+
+  for (i = 0; i < g->nr_drives; ++i)
+  {
+    debug(g, "diskbypath overlay=%s", g->drives[i]->overlay);
+
+    metadata = &g->drives[i]->metadata;
+    debug(g, "diskbypath metadata::target: dev=%s, bus=%s \n", 
+                         metadata->target.dev, metadata->target.bus);
+    debug(g, "diskbypath metadata::address: type=%s, domain=%s, bus=%s, slot=%s, function=%s \n", 
+                         metadata->address.type, metadata->address.domain, metadata->address.bus, metadata->address.slot, metadata->address.function);
+    debug(g, "diskbypath metadata::check=%s", metadata->check);
+ 
+    if (isDiskByPath(metadata, part, spec)) 
+    {
+        device = safe_asprintf (g, "/dev/sd%c%s", (char)('a' + i), part);
+        debug(g, "diskbypath device=%s", device);
+        break;
+    }
+  }
+
+  if(!device)
+  {
+      return 0;
+  }
+
+  if (!guestfs_int_is_partition (g, device)) 
+  {
+    free (device);
+    return 0;
+  }
+
+  *device_ret = device;
+  return 0;
+}
+
 /* Resolve block device name to the libguestfs device name, eg.
  * /dev/xvdb1 => /dev/vdb1; and /dev/mapper/VG-LV => /dev/VG/LV.  This
  * assumes that disks were added in the same order as they appear to
@@ -1974,6 +2019,12 @@ resolve_fstab_device (guestfs_h *g, const char *spec, Hash_table *md_map,
   }
   else if ((part = match1 (g, spec, re_diskbyid)) != NULL) {
     r = resolve_fstab_device_diskbyid (g, part, &device);
+    free (part);
+    if (r == -1)
+      return NULL;
+  }
+  else if ((part = match1 (g, spec, re_diskbypath)) != NULL) {
+    r = resolve_fstab_device_diskbypath (g, spec, part, &device);
     free (part);
     if (r == -1)
       return NULL;

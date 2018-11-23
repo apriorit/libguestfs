@@ -900,6 +900,8 @@ guestfs_impl_add_drive_opts (guestfs_h *g, const char *filename,
     return -1;
   }
 
+  drv->metadata = optargs->metadata;
+
   /* Add the drive. */
   if (g->state == CONFIG) {
     /* Not hotplugging, so just add it to the handle. */

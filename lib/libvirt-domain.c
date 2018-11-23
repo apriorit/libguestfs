@@ -42,7 +42,11 @@
 #if defined(HAVE_LIBVIRT)
 
 static xmlDocPtr get_domain_xml (guestfs_h *g, virDomainPtr dom);
-static ssize_t for_each_disk (guestfs_h *g, virConnectPtr conn, xmlDocPtr doc, int (*f) (guestfs_h *g, const char *filename, const char *format, int readonly, const char *protocol, char *const *server, const char *username, const char *secret, const char *device, void *data), void *data);
+static ssize_t for_each_disk (guestfs_h *g, virConnectPtr conn, xmlDocPtr doc, 
+                            int (*f) (guestfs_h *g, const char *filename, const char *format, 
+                                        int readonly, const char *protocol, char *const *server, 
+                                        const char *username, const char *secret, const char *device, void *data), 
+                            struct device_metadata *metadata, void *data);
 static int libvirt_selinux_label (guestfs_h *g, xmlDocPtr doc, char **label_rtn, char **imagelabel_rtn);
 static char *filename_from_pool (guestfs_h *g, virConnectPtr conn, const char *pool_nane, const char *volume_name);
 static bool xpath_object_is_empty (xmlXPathObjectPtr obj);
@@ -169,8 +173,10 @@ guestfs_impl_add_domain (guestfs_h *g, const char *domain_name,
   return r;
 }
 
-static int add_disk (guestfs_h *g, const char *filename, const char *format, int readonly, const char *protocol, char *const *server, const char *username, const char *secret, const char *device, void *data);
-static int connect_live (guestfs_h *g, virDomainPtr dom);
+static int add_disk (guestfs_h *g, const char *filename, const char *format, 
+                    int readonly, const char *protocol, char *const *server, 
+                    const char *username, const char *secret, const char *device, void *data);
+static int connect_live (guestfs_h *g, xmlDocPtr doc);
 
 enum readonlydisk {
   readonlydisk_error,
@@ -247,6 +253,12 @@ guestfs_impl_add_libvirt_dom (guestfs_h *g, void *domvp,
     return -1;
   }
 
+  /* Domain XML. */
+  if ((doc = get_domain_xml (g, dom)) == NULL)
+    return -1;
+
+  debug(g, "guestfs_impl_add_libvirt_dom: readonly=%d \n", readonly);
+
   if (!readonly) {
     virDomainInfo info;
     virErrorPtr err;
@@ -265,7 +277,7 @@ guestfs_impl_add_libvirt_dom (guestfs_h *g, void *domvp,
        * that live readonly connections are not possible.
        */
       if (live)
-        return connect_live (g, dom);
+        return connect_live (g, doc);
 
       /* Dangerous to modify the disks of a running VM. */
       error (g, _("error: domain is a live virtual machine.\n"
@@ -276,10 +288,6 @@ guestfs_impl_add_libvirt_dom (guestfs_h *g, void *domvp,
       return -1;
     }
   }
-
-  /* Domain XML. */
-  if ((doc = get_domain_xml (g, dom)) == NULL)
-    return -1;
 
   /* Find and pass the SELinux security label to the libvirt back end.
    * Note this has to happen before adding the disks, since those may
@@ -320,7 +328,7 @@ guestfs_impl_add_libvirt_dom (guestfs_h *g, void *domvp,
    * all disks are added or none are added.
    */
   ckp = guestfs_int_checkpoint_drives (g);
-  r = for_each_disk (g, virDomainGetConnect (dom), doc, add_disk, &data);
+  r = for_each_disk (g, virDomainGetConnect (dom), doc, add_disk, &data.optargs.metadata, &data);
   if (r == -1)
     guestfs_int_rollback_drives (g, ckp);
 
@@ -336,7 +344,18 @@ add_disk (guestfs_h *g,
   struct add_disk_data *data = datavp;
   /* Copy whole struct so we can make local changes: */
   struct guestfs_add_drive_opts_argv optargs = data->optargs;
+  struct device_metadata *metadata = &optargs.metadata;
   int readonly = -1, error = 0, skip = 0;
+
+  debug(g, "add_disk: filename=%s, format=%s, protocol=%s, username=%s, secret=%s, device=%s \n", 
+                    filename, format, protocol, username, secret, device);
+
+  debug(g, "add_disk metadata::target: dev=%s, bus=%s \n", 
+                    metadata->target.dev, metadata->target.bus);
+
+  debug(g, "add_disk metadata::address: type=%s, domain=%s, bus=%s, slot=%s, function=%s \n", 
+                    metadata->address.type, metadata->address.domain, metadata->address.bus, metadata->address.slot, metadata->address.function);
+
 
   if (readonly_in_xml) {        /* <readonly/> appears in the XML */
     if (data->readonly) {       /* asked to add disk read-only */
@@ -492,6 +511,7 @@ for_each_disk (guestfs_h *g,
                          const char *protocol, char *const *server,
                          const char *username, const char *secret,
                          const char *device, void *data),
+               struct device_metadata *metadata,
                void *data)
 {
   size_t i, nr_added = 0, nr_nodes;
@@ -531,6 +551,12 @@ for_each_disk (guestfs_h *g,
       CLEANUP_XMLXPATHFREEOBJECT xmlXPathObjectPtr xpusername = NULL;
       CLEANUP_XMLXPATHFREEOBJECT xmlXPathObjectPtr xppool = NULL;
       CLEANUP_XMLXPATHFREEOBJECT xmlXPathObjectPtr xpvolume = NULL;
+
+      CLEANUP_XMLXPATHFREEOBJECT xmlXPathObjectPtr xptargetDev = NULL;
+      CLEANUP_XMLXPATHFREEOBJECT xmlXPathObjectPtr xptargetBus = NULL;
+      CLEANUP_XMLXPATHFREEOBJECT xmlXPathObjectPtr xpaddressType = NULL;
+      CLEANUP_XMLXPATHFREEOBJECT xmlXPathObjectPtr xpaddressDomain = NULL;
+      memset(metadata, 0, sizeof(struct device_metadata));
       int readonly;
       int t;
       virErrorPtr err;
@@ -790,6 +816,28 @@ for_each_disk (guestfs_h *g,
       if (!xpath_object_is_empty (xpreadonly))
         readonly = 1;
 
+      xpathCtx->node = nodes->nodeTab[i];
+      xptargetDev = xmlXPathEvalExpression (BAD_CAST "./target/@dev", xpathCtx);
+      if (!xpath_object_is_empty (xptargetDev))
+        metadata->target.dev = xpath_object_get_string (doc, xptargetDev);
+
+      xpathCtx->node = nodes->nodeTab[i];
+      xptargetBus = xmlXPathEvalExpression (BAD_CAST "./target/@bus", xpathCtx);
+      if (!xpath_object_is_empty (xptargetBus))
+        metadata->target.bus = xpath_object_get_string (doc, xptargetBus);
+
+      xpathCtx->node = nodes->nodeTab[i];
+      xpaddressType = xmlXPathEvalExpression (BAD_CAST "./address/@type", xpathCtx);
+      if (!xpath_object_is_empty (xpaddressType))
+        metadata->address.type = xpath_object_get_string (doc, xpaddressType);
+
+      xpathCtx->node = nodes->nodeTab[i];
+      xpaddressDomain = xmlXPathEvalExpression (BAD_CAST "./address/@domain", xpathCtx);
+      if (!xpath_object_is_empty (xpaddressDomain))
+         metadata->address.domain = xpath_object_get_string (doc, xpaddressDomain);
+
+      strcpy(metadata->check, "serge");
+
       if (f)
         t = f (g, filename, format, readonly, protocol, server, username, secret, device, data);
       else
@@ -812,18 +860,13 @@ for_each_disk (guestfs_h *g,
 }
 
 static int
-connect_live (guestfs_h *g, virDomainPtr dom)
+connect_live (guestfs_h *g, xmlDocPtr doc)
 {
   int i;
-  CLEANUP_XMLFREEDOC xmlDocPtr doc = NULL;
   CLEANUP_XMLXPATHFREECONTEXT xmlXPathContextPtr xpathCtx = NULL;
   CLEANUP_XMLXPATHFREEOBJECT xmlXPathObjectPtr xpathObj = NULL;
   CLEANUP_FREE char *path = NULL, *backend = NULL;
   xmlNodeSetPtr nodes;
-
-  /* Domain XML. */
-  if ((doc = get_domain_xml (g, dom)) == NULL)
-    return -1;
 
   xpathCtx = xmlXPathNewContext (doc);
   if (xpathCtx == NULL) {
