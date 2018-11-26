@@ -1848,6 +1848,7 @@ resolve_fstab_device_diskbypath (guestfs_h *g, const char *spec, const char *par
   size_t i = 0;
   struct device_metadata* metadata = NULL;
   char *device = NULL;
+  struct PathBuildData pathBuildData = {};
 
   debug(g, "resolve_fstab_device_diskbypath spec=%s, part=%s", spec, part);
 
@@ -1857,7 +1858,7 @@ resolve_fstab_device_diskbypath (guestfs_h *g, const char *spec, const char *par
 
     metadata = &g->drives[i]->metadata;
 
-    if (isDiskByPath(g, metadata, part, spec)) 
+    if (isDiskByPath(g, metadata, part, spec, &pathBuildData)) 
     {
         device = safe_asprintf (g, "/dev/sd%c%s", (char)('a' + i), (part == NULL ? "" : part));
         debug(g, "diskbypath device=%s", device);

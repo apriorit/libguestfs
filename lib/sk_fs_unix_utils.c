@@ -23,9 +23,9 @@ static bool endsWith(const char *str, const char *end)
   return (strcmp(end, str + (strLen - endLen)) == 0);
 }
 
-static char * getVirtioPath(guestfs_h *g, struct device_metadata *metadata, const char *part)
+static char * getVirtioPath(guestfs_h *g, const struct device_metadata *metadata, const char *part)
 {
-  struct device_metadata_address *address = &metadata->address;
+  const struct device_metadata_address *address = &metadata->address;
 
   debug(g, "getVirtioPath metadata::address: type=%s, domain=%s, bus=%s, slot=%s, function=%s \n", 
             address->type, address->domain, address->bus, address->slot, address->function);
@@ -47,18 +47,24 @@ static char * getVirtioPath(guestfs_h *g, struct device_metadata *metadata, cons
                         (part == NULL ? "" : part));
 }
 
-static char * getIdePath(guestfs_h *g, struct device_metadata *metadata, const char *part)
+static char * getIdePath(guestfs_h *g, const struct device_metadata *metadata, const char *part, struct PathBuildData* pathBuildData)
 {
-  struct device_metadata_address *address = &metadata->address;
+  const struct device_metadata_address *address = &metadata->address;
 
   debug(g, "getIdePath metadata::address: type=%s, domain=%s, bus=%s, slot=%s, function=%s \n", 
             address->type, address->domain, address->bus, address->slot, address->function);
-  //todo implement
-  return NULL;
+
+  pathBuildData->ideCount++;
+
+  return safe_asprintf (g, "pci-0000:00:01.1-ata-%d%s%s",
+                        pathBuildData->ideCount,
+                        (part == NULL ? "" : "-part"),
+                        (part == NULL ? "" : part));
 
 }
 
-bool isDiskByPath(guestfs_h *g, struct device_metadata *metadata, const char *part, const char *spec)
+bool isDiskByPath(guestfs_h *g, const struct device_metadata *metadata, const char *part, 
+                  const char *spec, struct PathBuildData* pathBuildData)
 {
   const char *targetBus = metadata->target.bus;
   char *path = NULL;
@@ -81,7 +87,7 @@ bool isDiskByPath(guestfs_h *g, struct device_metadata *metadata, const char *pa
            STREQ (targetBus, DISK_BUS_SCSI) || 
            STREQ (targetBus, DISK_BUS_SATA ))
   {
-    path = getIdePath(g, metadata, part);
+    path = getIdePath(g, metadata, part, pathBuildData);
   }
   
   if (!path)

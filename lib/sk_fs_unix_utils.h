@@ -4,6 +4,13 @@
 #include <stdbool.h>
 #include "sk_device_metadata.h"
 
-extern bool isDiskByPath(guestfs_h *g, struct device_metadata *metadata, const char *part, const char *spec); 
+struct PathBuildData
+{
+    int virtioCount;
+    int ideCount;
+};
+
+extern bool isDiskByPath(guestfs_h *g, const struct device_metadata *metadata, const char *part, 
+                         const char *spec, struct PathBuildData* mdSpec); 
 
 #endif /* SK_FS_UNIX_UTILS_H_ */
