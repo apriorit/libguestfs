@@ -47,7 +47,8 @@ static char * getVirtioPath(guestfs_h *g, const struct device_metadata *metadata
                         (part == NULL ? "" : part));
 }
 
-static char * getIdePath(guestfs_h *g, const struct device_metadata *metadata, const char *part, struct PathBuildData* pathBuildData)
+static char * getIdePath(guestfs_h *g, const struct device_metadata *metadata, 
+                         const char *part, struct path_build_data* pathBuildData)
 {
   const struct device_metadata_address *address = &metadata->address;
 
@@ -63,16 +64,31 @@ static char * getIdePath(guestfs_h *g, const struct device_metadata *metadata, c
 
 }
 
+static char * getIdeId(guestfs_h *g, const struct device_metadata *metadata, 
+                         const char *part, struct path_build_data* pathBuildData)
+{
+  const struct device_metadata_address *address = &metadata->address;
+
+  debug(g, "getIdeId metadata::address: type=%s, domain=%s, bus=%s, slot=%s, function=%s \n", 
+            address->type, address->domain, address->bus, address->slot, address->function);
+
+  pathBuildData->ideCount++;
+
+  return safe_asprintf (g, "QEMU_HARDDISK_QM0000%d%s%s",
+                        pathBuildData->ideCount,
+                        (part == NULL ? "" : "-part"),
+                        (part == NULL ? "" : part));
+
+}
+
 bool isDiskByPath(guestfs_h *g, const struct device_metadata *metadata, const char *part, 
-                  const char *spec, struct PathBuildData* pathBuildData)
+                  const char *spec, struct path_build_data* pathBuildData)
 {
   const char *targetBus = metadata->target.bus;
   char *path = NULL;
   bool res = false;
 
-  debug(g, "isDiskByPath spec=%s, part=%s", spec, part);
-  debug(g, "isDiskByPath metadata::target: dev=%s, bus=%s \n", 
-            metadata->target.dev, targetBus);
+  debug(g, "isDiskByPath spec=%s, part=%s, bus=%s", spec, part, targetBus);
 
   if (!targetBus)
   {
@@ -102,4 +118,44 @@ bool isDiskByPath(guestfs_h *g, const struct device_metadata *metadata, const ch
   free(path);
 
   return res;
+}
+
+bool isDiskById(guestfs_h *g, const struct device_metadata *metadata, const char *part, 
+                  const char *spec, struct path_build_data* pathBuildData)
+{
+  const char *targetBus = metadata->target.bus;
+  char *id = NULL;
+  bool res = false;
+
+  debug(g, "isDiskById spec=%s, part=%s, bus=%s", spec, part, targetBus);
+
+  if (!targetBus)
+  {
+    return false;
+  }
+
+  if (STREQ (targetBus, DISK_BUS_IDE) ||
+      STREQ (targetBus, DISK_BUS_SCSI) || 
+      STREQ (targetBus, DISK_BUS_SATA ))
+  {
+    id = getIdeId(g, metadata, part, pathBuildData);
+  }
+  
+  if (!id)
+  {
+      return false;
+  }
+
+  debug(g, "isDiskById id=%s", id);
+
+  //compare only tail
+  res = endsWith(spec, id);
+  free(id);
+
+  return res;
+}
+
+char *createDiskName(guestfs_h *g, size_t diskIndex, const char *part)
+{
+    return safe_asprintf (g, "/dev/sd%c%s", (char)('a' + diskIndex), (part == NULL ? "" : part));
 }

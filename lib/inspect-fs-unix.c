@@ -62,7 +62,8 @@ COMPILE_REGEXP (re_mdN, "^(/dev/md\\d+)$", 0)
 COMPILE_REGEXP (re_freebsd_mbr,
                 "^/dev/(ada{0,1}|vtbd)(\\d+)s(\\d+)([a-z])$", 0)
 COMPILE_REGEXP (re_freebsd_gpt, "^/dev/(ada{0,1}|vtbd)(\\d+)p(\\d+)$", 0)
-COMPILE_REGEXP (re_diskbyid, "^/dev/disk/by-id/.*-part(\\d+)$", 0)
+COMPILE_REGEXP (re_diskbyidpart, "^/dev/disk/by-id/.*-part(\\d+)$", 0)
+COMPILE_REGEXP (re_diskbyid, "^/dev/disk/by-id/.*", 0)
 COMPILE_REGEXP (re_diskbypathpart, "^/dev/disk/by-path/.*-part(\\d+)$", 0)
 COMPILE_REGEXP (re_diskbypath, "^/dev/disk/by-path/.*", 0)
 COMPILE_REGEXP (re_netbsd, "^NetBSD (\\d+)\\.(\\d+)", 0)
@@ -1804,11 +1805,16 @@ resolve_fstab_device_cciss (guestfs_h *g, const char *disk, const char *part,
 }
 
 static int
-resolve_fstab_device_diskbyid (guestfs_h *g, const char *part,
-                               char **device_ret)
+resolve_fstab_device_diskbyParam (guestfs_h *g, 
+                               bool (*compareSpec)(guestfs_h*, const struct device_metadata*, const char *part, 
+                                                     const char*, struct path_build_data*),
+                               const char *spec, const char *part, char **device_ret)
 {
-  int nr_devices;
-  char *device;
+  int nr_devices = 0;
+  char *device = NULL;
+  size_t i = 0;
+  struct device_metadata* metadata = NULL;
+  struct path_build_data pathBuildData = {};
 
   /* For /dev/disk/by-id there is a limit to what we can do because
    * original SCSI ID information has likely been lost.  This
@@ -1822,63 +1828,56 @@ resolve_fstab_device_diskbyid (guestfs_h *g, const char *part,
    * See also: https://bugzilla.redhat.com/show_bug.cgi?id=836573#c3
    */
 
+  debug(g, "resolve_fstab_device_diskbyParam spec=%s, part=%s", spec, part);
+
   nr_devices = guestfs_nr_devices (g);
   if (nr_devices == -1)
     return -1;
 
-  /* If #devices isn't 1, give up trying to translate this fstab entry. */
-  if (nr_devices != 1)
-    return 0;
-
-  /* Make the partition name and check it exists. */
-  device = safe_asprintf (g, "/dev/sda%s", part);
-  if (!guestfs_int_is_partition (g, device)) {
-    free (device);
-    return 0;
-  }
-
-  *device_ret = device;
-  return 0;
-}
-
-static int
-resolve_fstab_device_diskbypath (guestfs_h *g, const char *spec, const char *part,
-                               char **device_ret)
-{
-  size_t i = 0;
-  struct device_metadata* metadata = NULL;
-  char *device = NULL;
-  struct PathBuildData pathBuildData = {};
-
-  debug(g, "resolve_fstab_device_diskbypath spec=%s, part=%s", spec, part);
-
-  for (i = 0; i < g->nr_drives; ++i)
+  /* keep original logic for one device. */
+  if (nr_devices == 1)
   {
-    debug(g, "diskbypath overlay=%s", g->drives[i]->overlay);
-
-    metadata = &g->drives[i]->metadata;
-
-    if (isDiskByPath(g, metadata, part, spec, &pathBuildData)) 
-    {
-        device = safe_asprintf (g, "/dev/sd%c%s", (char)('a' + i), (part == NULL ? "" : part));
-        debug(g, "diskbypath device=%s", device);
-        break;
+    /* Make the partition name and check it exists. */
+    device = createDiskName(g, 0, part);
+    if (!guestfs_int_is_partition (g, device)) {
+      free (device);
+      return 0;
     }
-  }
 
+    *device_ret = device;
+    return 0;
+  }
+  else
+  {
+    for (i = 0; i < g->nr_drives; ++i)
+    {
+      metadata = &g->drives[i]->metadata;
+
+      if (compareSpec(g, metadata, part, spec, &pathBuildData)) 
+      {
+          device = createDiskName(g, i, part);
+          break;
+      }
+  }
+  }
   if(!device)
   {
+      debug(g, "disk is not found");
       return 0;
   }
 
   if (part != NULL && !guestfs_int_is_partition (g, device)) 
   {
+    debug(g, "device=%s is not a partition", device);
     free (device);
     return 0;
   }
 
+  debug(g, "device=%s", device);
   *device_ret = device;
   return 0;
+
+
 }
 
 /* Resolve block device name to the libguestfs device name, eg.
@@ -2015,15 +2014,16 @@ resolve_fstab_device (guestfs_h *g, const char *spec, Hash_table *md_map,
     if (disk_i != -1 && part_i >= 0 && part_i < 15)
       device = safe_asprintf (g, "/dev/sd%c%d", disk_i + 'a', part_i + 5);
   }
-  else if ((part = match1 (g, spec, re_diskbyid)) != NULL) {
-    r = resolve_fstab_device_diskbyid (g, part, &device);
+  else if ((part = match1 (g, spec, re_diskbyidpart)) != NULL ||
+            (match(g, spec, re_diskbyid))) {
+    r = resolve_fstab_device_diskbyParam (g, isDiskById, spec, part, &device);
     free (part);
     if (r == -1)
       return NULL;
   }
   else if ((part = match1 (g, spec, re_diskbypathpart)) != NULL || 
            (match(g, spec, re_diskbypath))) {
-    r = resolve_fstab_device_diskbypath (g, spec, part, &device);
+    r = resolve_fstab_device_diskbyParam (g, isDiskByPath, spec, part, &device);
     free (part);
     if (r == -1)
       return NULL;
