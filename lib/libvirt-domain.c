@@ -822,10 +822,10 @@ for_each_disk (guestfs_h *g,
 
       //Metadata +
 
-    //   xpathCtx->node = nodes->nodeTab[i];
-    //   xptargetDev = xmlXPathEvalExpression (BAD_CAST "./target/@dev", xpathCtx);
-    //   if (!xpath_object_is_empty (xptargetDev))
-    //     metadata->target.dev = xpath_object_get_string (doc, xptargetDev);
+      xpathCtx->node = nodes->nodeTab[i];
+      xptargetDev = xmlXPathEvalExpression (BAD_CAST "./target/@dev", xpathCtx);
+      if (!xpath_object_is_empty (xptargetDev))
+        metadata->target.dev = xpath_object_get_string (doc, xptargetDev);
 
       xpathCtx->node = nodes->nodeTab[i];
       xptargetBus = xmlXPathEvalExpression (BAD_CAST "./target/@bus", xpathCtx);
@@ -859,13 +859,7 @@ for_each_disk (guestfs_h *g,
         if (!xpath_object_is_empty (xpaddressFunction))
           metadata->address.function = xpath_object_get_string (doc, xpaddressFunction);
       }
-      else if (STREQ (metadata->target.bus, DISK_BUS_IDE) ||
-               STREQ (metadata->target.bus, DISK_BUS_SCSI) || 
-               STREQ (metadata->target.bus, DISK_BUS_SATA))
-      {
-        //todo add metadata 
-      }
-
+ 
       //Metadata -
 
       if (f)

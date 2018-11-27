@@ -1849,6 +1849,17 @@ resolve_fstab_device_diskbyParam (guestfs_h *g,
   }
   else
   {
+   /* find a disk which has path (or id). 
+      There are several specifics
+      1. Disk by path for virtio bus depends on disk metadata and we accurately hendle it.
+      2. Disk by Id and Disk by path for ide, scsi and sata bus depends on disk index in libvirt xml 
+          and internal system setting on VM. 
+          So for this ( ide, scsi and sata ) bus there are many cases when our algorithm does not work.  
+          For example: 
+            - For Miks Disks with and without partitions algorithm does not work
+            - After disk manipulations (change disk bus and indexies) we can get situation 
+               when disk path (id) numeraion is break (missed some index numbers).
+    */
     for (i = 0; i < g->nr_drives; ++i)
     {
       metadata = &g->drives[i]->metadata;
