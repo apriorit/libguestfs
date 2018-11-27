@@ -438,6 +438,7 @@ extern \"C\" {
 #include <stddef.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include \"sk_device_metadata.h\"
 
 #if defined(__GNUC__) && !defined(GUESTFS_GCC_VERSION)
 # define GUESTFS_GCC_VERSION \\
@@ -697,6 +698,8 @@ extern GUESTFS_DLL_PUBLIC void *guestfs_next_private (guestfs_h *g, const char *
           pr "# define GUESTFS_%s_%s_BITMASK (UINT64_C(1)<<%d)\n" uc_shortname uc_n i;
           pr "  %s%s;\n" c_type n
       ) optargs;
+      if compare shortname "add_drive_opts" = 0 then
+        pr "  struct device_metadata metadata;\n";
       pr "};\n";
       pr "\n";
 
